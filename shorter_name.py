@@ -3,41 +3,30 @@ import re
 
 MAX_FILENAME_LENGTH = 255
 MP4_EXTENSION = ".mp4"
-
-# for UTF-8.JA_JP support
-___UTF8_JA_JP_SUPPORT___ = True
 DEFAULT_ENCODING = 'utf-8'
 MAX_CHAR_LEN = 3
 
+def get_bytes_length(filename, encoding=DEFAULT_ENCODING):
+    utf8_strings = filename.encode(encoding)
+    return len(utf8_strings)
+
 def get_adjusted_filename(basename, extension=MP4_EXTENSION, footer="", encoding=DEFAULT_ENCODING):
-#if ___UTF8_JA_JP_SUPPORT___:
     #
     # Cut off at the character boundary of Japanese UTF-8 Kanji characters
     #
-    _max_bytes = MAX_FILENAME_LENGTH - len(extension) - len(footer)
-    encoded_basename = basename.encode(encoding)
-
+    extension_bytes = get_bytes_length(extension)
+    footer_bytes = get_bytes_length(footer)
+    _max_bytes = MAX_FILENAME_LENGTH - extension_bytes - footer_bytes
+ 
     # Shave off the last positional character until 
     # it is less than or equal to the value of _max_bytes.
-    while len(encoded_basename) > _max_bytes:
-        encoded_basename = encoded_basename[:-1]
-
-    # DECODE adjusted base name.
-    try:
-        _new_basename = encoded_basename.decode(encoding)
-        return _new_basename + footer + extension
-    except UnicodeDecodeError:
-        # エラーが発生した場合、エラーメッセージを出力する
-        print(f"***ERROR***: Could not DECODE file name,{encoded_basename}.")
-        return ""
-#else:
-    # Base name of the file is truncated at the maximum length
-    filename_length = len(basename) + len(extension)
-    if filename_length > MAX_FILENAME_LENGTH:
-        _new_basename = basename[:MAX_FILENAME_LENGTH - len(extension)]
-    else:
-        _new_basename = basename
-    return _new_basename + extension
+    exceeded_bytes = get_bytes_length(basename, encoding) - _max_bytes
+    if exceeded_bytes > 0:
+        basename = basename[:-(exceeded_bytes // MAX_CHAR_LEN) ]
+        while get_bytes_length(basename, encoding) > _max_bytes:
+            basename = basename[:-1]
+ 
+    return basename + footer + extension
 
 def rename_mp4_files(input_dir, output_dir):
     mp4_files = [
@@ -57,7 +46,6 @@ def rename_mp4_files(input_dir, output_dir):
             print(f"before: {path}")
             print(f"after : {new_path}")
 
-        # 
         # os.rename(path, new_path)
 
 
