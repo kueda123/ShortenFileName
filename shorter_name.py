@@ -28,14 +28,16 @@ def get_max_char_bytes(basename):
     # Get the maximum length of the charactor in Japanese UTF-8 characters.
     return 4 if any(ord(c) >= 1280 for c in basename) else 3
 
-def truncate_filename_at_word_boundary(basename, max_basename_bytes):
+def truncate_filename_at_word_boundary(basename, max_basename_bytes, encoding):
     """
     Shorten the base name to the maximum character boundary
     """
     exceeded_bytes = get_bytes_length(basename) - max_basename_bytes
     if exceeded_bytes > 0:
-        basename = basename[:-(exceeded_bytes//get_max_char_bytes(basename))]
-        while get_bytes_length(basename, encoding) > exceeded_bytes:
+        reduced_char_count = exceeded_bytes//get_max_char_bytes(basename)
+        if (reduced_char_count > 0):
+            basename = basename[:-reduced_char_count]
+        while get_bytes_length(basename, encoding) > max_basename_bytes:
             basename = basename[:-1]
     return basename
 
@@ -74,7 +76,7 @@ def get_adjusted_filename(basename: str, extension: str = MP4_EXTENSION,
     max_basename_bytes = remaining_bytes(footer, extension,  encoding)
 
     # If the filename is longer than the maximum length, truncate it from the end.
-    basename = truncate_filename_at_word_boundary(basename, max_basename_bytes)
+    basename = truncate_filename_at_word_boundary(basename, max_basename_bytes, encoding)
 
     # Add the extension to the filename.
     return basename + footer + extension
@@ -88,8 +90,8 @@ def rename_mp4_files(input_dir, output_dir):
     for path in mp4_files:
         dir, filename = os.path.split(path)
         base, extension = os.path.splitext(filename)
-        new_base = re.findall(r"「(.*?)」", base, flags=re.UNICODE)[0]
-        new_filename = get_adjusted_filename(new_base, extension, footer="")
+        new_base = re.findall(r"「(.*?)」：", base, flags=re.UNICODE)[0]
+        new_filename = get_adjusted_filename(new_base, extension, footer="_MAC")
         new_path = os.path.join(output_dir, new_filename)
 
         # デバッグ用出力
@@ -97,11 +99,15 @@ def rename_mp4_files(input_dir, output_dir):
             print(f"before: {path}")
             print(f"after : {new_path}")
 
-        # os.rename(path, new_path)
+        try:
+            os.rename(path, new_path)
+        except FileExistsError as e:
+            print(f"***ERROR***: {e}")
+            print(f"***ERROR***: Failed to rename({path}, {new_path})")
 
 
 if __name__ == "__main__":
     ___DEBUG___ = True
-    input_dir = "/path/to/input/dir"
-    output_dir = "/path/to/output/dir"
+    input_dir = "d:/media"
+    output_dir = "d:/output"
     rename_mp4_files(input_dir, output_dir)
