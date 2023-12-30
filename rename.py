@@ -1,24 +1,48 @@
 import re
 
-def rename(filename, patterns):
+def get_idx(replace):
+    m1 = re.match(r"^\$([0-9]*)$", replace)
+    if m1 is None:
+        raise ValueError("置換文字列の値が数値に変換できません。")
+    return int(m1.group(1))
+
+
+def selecter(filename, patterns):
   for pattern in patterns:
-    prefix = pattern.get("prefix")
-    transfers = pattern.get("transfers")
-    suffix = pattern.get("suffix")
+    if re.match(pattern.get("prefix"), filename):
+      return pattern
 
-    if prefix:
-      filename = re.sub(prefix, "", filename)
+  return None
 
-    for transfer in transfers:
-      pattern = transfer.get("pattern")
-      replace = transfer.get("replace")
 
-      filename = re.sub(pattern, replace, filename)
+def do_replace(pattern, replace, filename):
+    m = re.match(pattern, filename)
+    if m is None:
+        raise ValueError("The pattern `", pattern, "` was not matched.")
+    group_idx = get_group_idx(replace)
+    if group_idx > m.lastindex():
+        raise ValueError("The group index `", group_idx, "` is out of range.")
+    return m.group(group_idx)
 
-    if suffix:
-      filename = filename + suffix
 
-  return filename
+def rename(filename, patterns):
+    selected_pattern = selecter(filename, patterns)
+
+    if selected_pattern:
+        for i, transfer in enumerate(selected_pattern.get("transfers")):
+            pattern = transfer.get("pattern")
+            replace = transfer.get("replace")
+            try:
+                filename = do_replace(pattern, replace, filename)
+            except ValueError as e:
+                print("The pattern `", pattern, "` was not matched at `", i, "`.", file=sys.stderr)
+                raise
+
+        suffix = selected_pattern.get("suffix")
+        if suffix:
+            filename = filename + suffix
+    return filename
+
 
 
 def main():
@@ -31,7 +55,14 @@ def main():
       ],
       "suffix": "_MAC"
     },
-  ]
+    {
+      "prefix": "^「(.*?)」",
+      "transfers": [
+        { "pattern": "^「",    "replace": "$1" },
+        { "pattern": "(.*)",  "replace": "$1_MAC" },
+      ],
+      "suffix": "_MAD"
+    },  ]
 
   filenames = ["「ファイル名1」.mp4", "「ファイル名2」.mp4"]
 
